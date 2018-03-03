@@ -143,7 +143,14 @@ function rss(Application $app, Request $request) {
 
     $xml = new SimpleXMLElement('<rss/>');
     $xml->addAttribute('version', '2.0');
+
     $channel = $xml->addChild('channel');
+
+    $title = $channel->addChild('title','Cakebox');
+    $description = $channel->addChild('description', 'Cakebox');
+    $link = $request->isSecure() ? 'https://' : 'http://';
+    $link .= $app['cakebox.host'];
+    $link_item = $channel->addChild('link', $link);
 
     $finder = new Finder();
     $finder->followLinks()
@@ -163,17 +170,23 @@ function rss(Application $app, Request $request) {
             $date = new \DateTime();
             $date->setTimestamp($file->getMTime());
 
-            $item->addChild('title', '<![CDATA['.$file->getBasename().']]>');
+            $item->addChild('title', $file->getBasename());
 
             $link = $request->isSecure() ? 'https://' : 'http://';
-            $link .= $app['cakebox.host'] . $app['cakebox.access'] . DIRECTORY_SEPARATOR;
-            $link .= $file->getRelativePath() . DIRECTORY_SEPARATOR . $file->getBasename();
+            $link .= $app['cakebox.host'] . $app['cakebox.access'];
+            $link .= $request->get('path', '') . DIRECTORY_SEPARATOR . $file->getRelativePath() . DIRECTORY_SEPARATOR . $file->getBasename();
 
             $item->addChild('link', $link);
-            $item->addChild('pubDate', $date->format(DATE_W3C));
+            $item->addChild('guid', $link);
+            $item->addChild('pubDate', $date->format(DATE_RFC822));
         }
 
     }
 
-    return new Response($xml->asXML(), 200, ['Content-Type' => 'application/xml']);
+    $doc = new \DOMDocument();
+    $doc->preserveWhiteSpace = false;
+    $doc->formatOutput = true;
+    $doc->loadXML($xml->asXML());
+
+    return new Response($doc->saveXML(), 200, ['Content-Type' => 'application/rss+xml']);
 }
